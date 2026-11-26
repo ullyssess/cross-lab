@@ -1,0 +1,7 @@
+{
+  "name": "cross-lab",
+  "version": "1.0.0",
+  "description": "Cross-lab development: codex (OpenAI) implements plan tasks in an isolated worktree, Claude controls and reviews; findings loop until review is clean.",
+  "author": { "name": "ullyssess" },
+  "keywords": ["codex", "code-review", "superpowers", "implementation-plan"]
+}

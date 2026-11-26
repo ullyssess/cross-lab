@@ -1,0 +1,10 @@
+# codex profile for cross-lab-development.
+# Copy to ~/.codex/cross-lab.config.toml (selected with `codex --profile cross-lab`).
+#
+# Non-interactive: nobody sits at codex's prompt, so approval_policy = never.
+# The sandbox stays on (workspace-write): writes outside the worktree are
+# blocked, and with no approver the brake is hard.
+# writable_roots and network_access are set per run by xlab-dispatch.sh
+# (it overrides whatever is here), so they are not configured in this file.
+approval_policy = "never"
+sandbox_mode = "workspace-write"

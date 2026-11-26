@@ -1,0 +1,107 @@
+#!/usr/bin/env bash
+# set-model — change the models bound to cross-lab roles.
+#
+#   set-model                          # show the roster
+#   set-model reviewer.default opus    # set a role's model
+#   set-model implementer gpt-5.5      # probes the model before writing
+#
+# Roles are FIXED — this only swaps the models bound to them.
+# Writes to ~/.claude/cross-lab/models.toml (copied from the bundled defaults
+# on first write), so plugin updates never overwrite your choices.
+set -euo pipefail
+
+HERE="$(cd "$(dirname "$0")" && pwd)"
+BUNDLED="$HERE/../models.toml"
+ROSTER="$(bash "$HERE/roster-path.sh")"
+ALIASES=(opus sonnet haiku fable)
+
+die() { printf 'set-model: %s\n' "$*" >&2; exit 1; }
+
+[ -f "$ROSTER" ] || die "no roster at $ROSTER"
+
+get() {
+  awk -v s="[$1]" -v k="$2" '
+    /^\[/ { insec = ($0 == s); next }
+    insec && $0 ~ "^[[:space:]]*"k"[[:space:]]*=" {
+      if (match($0, /"[^"]*"/)) { print substr($0, RSTART+1, RLENGTH-2); exit }
+    }' "$ROSTER"
+}
+
+show() {
+  printf 'Roster (%s):\n' "$ROSTER"
+  printf '  planner            = %-16s (verified, not switched — change with /model)\n' "$(get planner model)"
+  printf '  implementer        = %-16s (codex exec -m)\n' "$(get implementer model)"
+  printf '  plan_reviewer      = %-16s (plan review; empty = implementer)\n' "$(get plan_reviewer model)"
+  printf '  reviewer.light     = %-16s (small mechanical diff)\n' "$(get reviewer light)"
+  printf '  reviewer.default   = %-16s (typical task)\n' "$(get reviewer default)"
+  printf '  reviewer.heavy     = %-16s (architecture / security)\n' "$(get reviewer heavy)"
+  printf '  reviewer.final     = %-16s (whole-branch review)\n' "$(get reviewer final)"
+}
+
+[ $# -eq 0 ] && { show; exit 0; }
+[ $# -eq 2 ] || die "usage: set-model [ROLE MODEL]   (no arguments = show roster)"
+
+ROLE="$1"; VALUE="$2"
+
+case "$ROLE" in
+  planner)          SECTION=planner;       KEY=model;   KIND=alias ;;
+  implementer)      SECTION=implementer;   KEY=model;   KIND=openai ;;
+  plan_reviewer)    SECTION=plan_reviewer; KEY=model;   KIND=openai ;;
+  reviewer.light)   SECTION=reviewer;      KEY=light;   KIND=alias ;;
+  reviewer.default) SECTION=reviewer;      KEY=default; KIND=alias ;;
+  reviewer.heavy)   SECTION=reviewer;      KEY=heavy;   KIND=alias ;;
+  reviewer.final)   SECTION=reviewer;      KEY=final;   KIND=alias ;;
+  *) die "unknown role: $ROLE
+allowed: planner, implementer, plan_reviewer, reviewer.light, reviewer.default, reviewer.heavy, reviewer.final" ;;
+esac
+
+# planner and reviewer.* feed the Agent tool's `model` enum -> aliases ONLY.
+# An OpenAI model as reviewer would break "no codex self-review".
+if [ "$KIND" = alias ]; then
+  ok=0
+  for a in "${ALIASES[@]}"; do [ "$VALUE" = "$a" ] && ok=1; done
+  [ "$ok" = 1 ] || die "'$VALUE' is not allowed for $ROLE.
+Agent(model:) is an enum — allowed ONLY: ${ALIASES[*]}
+A full ID (e.g. claude-opus-4-8) does not work. An OpenAI model here breaks 'no codex self-review'."
+fi
+
+# Probe the OpenAI model: never write a model that will blow up the run.
+if [ "$KIND" = openai ]; then
+  command -v codex >/dev/null || die "no codex CLI — cannot probe '$VALUE'"
+  printf 'Probing %s through codex…\n' "$VALUE"
+  TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
+  codex exec -m "$VALUE" --sandbox read-only --skip-git-repo-check \
+    -o "$TMP/probe.txt" "reply with exactly: MODEL_OK" > "$TMP/probe.log" 2>&1 || true
+  # grep the -o file, NEVER stdout: codex echoes the prompt into stdout
+  if ! grep -q MODEL_OK "$TMP/probe.txt" 2>/dev/null; then
+    printf 'set-model: model "%s" is UNAVAILABLE — not writing.\n' "$VALUE" >&2
+    grep -m1 '^ERROR' "$TMP/probe.log" >&2 || tail -3 "$TMP/probe.log" >&2
+    exit 1
+  fi
+  printf '  MODEL_OK\n'
+fi
+
+OLD="$(get "$SECTION" "$KEY")"
+[ "$OLD" = "$VALUE" ] && { printf '%s = %s (unchanged)\n' "$ROLE" "$VALUE"; exit 0; }
+
+# First write: move off the bundled defaults onto the user's own copy.
+if [ "$ROSTER" -ef "$BUNDLED" ]; then
+  mkdir -p "$HOME/.claude/cross-lab"
+  cp "$BUNDLED" "$HOME/.claude/cross-lab/models.toml"
+  ROSTER="$HOME/.claude/cross-lab/models.toml"
+fi
+
+TMPF="$(mktemp)"
+awk -v s="[$SECTION]" -v k="$KEY" -v v="$VALUE" '
+  /^\[/ { insec = ($0 == s) }
+  insec && !done && $0 ~ "^[[:space:]]*"k"[[:space:]]*=" {
+    sub(/"[^"]*"/, "\"" v "\""); done = 1
+  }
+  { print }
+' "$ROSTER" > "$TMPF"
+
+grep -q "\"$VALUE\"" "$TMPF" || { rm -f "$TMPF"; die "write failed — roster untouched"; }
+mv "$TMPF" "$ROSTER"
+
+printf '%s: %s -> %s\n\n' "$ROLE" "$OLD" "$VALUE"
+show

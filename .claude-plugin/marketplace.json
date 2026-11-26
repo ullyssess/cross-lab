@@ -1,0 +1,14 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "cross-lab",
+  "owner": { "name": "ullyssess" },
+  "metadata": { "description": "Cross-lab development plugin: codex implements, Claude reviews." },
+  "plugins": [
+    {
+      "name": "cross-lab",
+      "source": "./",
+      "description": "Cross-lab development: codex (OpenAI) implements plan tasks in an isolated worktree, Claude controls and reviews.",
+      "version": "1.0.0"
+    }
+  ]
+}

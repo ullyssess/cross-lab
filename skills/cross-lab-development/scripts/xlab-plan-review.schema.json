@@ -1,0 +1,28 @@
+{
+  "type": "object",
+  "properties": {
+    "verdict": { "type": "string", "enum": ["APPROVED", "REVISE", "BLOCKED"] },
+    "reason": { "type": "string", "minLength": 10 },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "severity": { "type": "string", "enum": ["P0", "P1", "P2", "NIT"] },
+          "confidence": { "type": "string", "enum": ["CONFIRMED", "PLAUSIBLE"] },
+          "task": { "type": "string" },
+          "path": { "type": "string" },
+          "line": { "type": ["integer", "null"] },
+          "title": { "type": "string" },
+          "evidence": { "type": "string" },
+          "fix": { "type": "string" }
+        },
+        "required": ["severity", "confidence", "task", "path", "line", "title", "evidence", "fix"],
+        "additionalProperties": false
+      }
+    },
+    "not_verified": { "type": ["string", "null"] }
+  },
+  "required": ["verdict", "reason", "findings", "not_verified"],
+  "additionalProperties": false
+}
