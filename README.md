@@ -27,8 +27,7 @@ wytyka sprzeczności z repo, zanim powstanie jakikolwiek kod.
 
 ## Instalacja
 
-1. Plugin (repo jest prywatne, więc potrzebny jest dostęp do niego na GitHubie
-   i zalogowany `gh` albo klucz SSH):
+1. Plugin:
    ```
    /plugin marketplace add ullyssess/cross-lab
    /plugin install cross-lab@cross-lab
@@ -130,3 +129,7 @@ skills/cross-lab-development/
                            review planu, ledger, lekcje, set-model
 examples/cross-lab.config.toml   profil codexa
 ```
+
+## Licencja
+
+MIT — patrz [LICENSE](LICENSE).
